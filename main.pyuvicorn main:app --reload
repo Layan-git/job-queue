@@ -1,0 +1,27 @@
+from fastapi import FastAPI
+import redis
+import uuid
+import json
+
+app = FastAPI()
+r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+
+@app.post("/jobs")
+def create_job(payload: dict):
+    job_id = str(uuid.uuid4())
+    job_data = {
+        "id": job_id,
+        "status": "pending",
+        "payload": payload,
+        "retries": 0
+    }
+    r.lpush("job_queue", json.dumps(job_data))
+    r.set(f"job:{job_id}", json.dumps(job_data))
+    return {"job_id": job_id, "status": "pending"}
+
+@app.get("/jobs/{job_id}")
+def get_job(job_id: str):
+    data = r.get(f"job:{job_id}")
+    if not data:
+        return {"error": "not found"}
+    return json.loads(data)
